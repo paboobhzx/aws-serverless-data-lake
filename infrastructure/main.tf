@@ -76,6 +76,13 @@ resource "aws_lambda_permission" "allow_s3" {
     principal = "s3.amazonaws.com"
     source_arn = aws_s3_bucket.raw_bucket.arn 
 }
+terraform { 
+    backend "s3" {
+        bucket = "pablo-tf-state-backend-732"
+        key = "serverless-data-lake/terraform.tfstate"
+        region = "us-east-1"
+    }
+}
 #Outputs
 output "ecr_repo_url" { value = aws_ecr_repository.etl_repo.repository_url }
 output "raw_bucket_name" { value = aws_s3_bucket.raw_bucket.id}
