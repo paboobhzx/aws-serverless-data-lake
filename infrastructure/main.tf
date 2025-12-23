@@ -121,7 +121,7 @@ resource "aws_iam_role_policy" "glue_policy" {
         Version = "2012-10-17"
         Statement = [{ 
             Effect = "Allow",
-            Actions = ["s3:GetObject", "s3:ListBucket"],
+            Action = ["s3:GetObject", "s3:ListBucket"],
             Resource = [ 
                 aws_s3_bucket.clean_bucket.arn ,
                 "${aws_s3_bucket.clean_bucket.arn}/*"
