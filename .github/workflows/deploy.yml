@@ -1,0 +1,65 @@
+name: Deploy Serverless Data Lake
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to AWS
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+    # 1. Check out the code
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # 2. Configure AWS Credentials
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    # 3. Setup Terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+
+    # 4. Terraform Apply (Infrastructure)
+    - name: Terraform Apply
+      run: |
+        cd infrastructure
+        terraform init
+        terraform apply -auto-approve
+      env:
+        # We export the ECR repo name so Terraform knows it (if using variables)
+        TF_VAR_ecr_repo_name: serverless-etl-processor
+
+    # 5. Get ECR Login
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    # 6. Build & Push Docker Image (Application)
+    - name: Build and Push Docker Image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: serverless-etl-processor
+        IMAGE_TAG: latest
+      run: |
+        cd etl-script
+        # We use --provenance=false to fix the Lambda error you saw earlier!
+        docker build --provenance=false -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    # 7. Update Lambda Function
+    - name: Update Lambda Code
+      run: |
+        aws lambda update-function-code \
+          --function-name serverless_etl_processor \
+          --image-uri ${{ steps.login-ecr.outputs.registry }}/serverless-etl-processor:latest
